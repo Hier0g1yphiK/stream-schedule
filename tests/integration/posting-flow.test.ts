@@ -121,9 +121,9 @@ describe('Integration: Schedule Posting Flow', () => {
       const sentMessage = sendMock.mock.calls[0][0] as string;
       expect(sentMessage).toContain('📅 **Weekly Stream Schedule**');
       expect(sentMessage).toContain('**Wednesday**');
-      expect(sentMessage).toContain('14:00 — Alice — Art Stream');
+      expect(sentMessage).toMatch(/<t:\d+:t> — Alice — Art Stream/);
       expect(sentMessage).toContain('**Friday**');
-      expect(sentMessage).toContain('20:00 — Bob — Gaming Night');
+      expect(sentMessage).toMatch(/<t:\d+:t> — Bob — Gaming Night/);
     });
 
     it('should clear entries after posting via checkAndPost', async () => {
@@ -234,14 +234,14 @@ describe('Integration: Schedule Posting Flow', () => {
       expect(mondayIndex).toBeLessThan(wednesdayIndex);
       expect(wednesdayIndex).toBeLessThan(fridayIndex);
 
-      // Verify time sorting within Monday: 09:00 before 15:00
-      const morningIndex = sentMessage.indexOf('09:00 — Charlie — Morning Session');
-      const afternoonIndex = sentMessage.indexOf('15:00 — Bob — Afternoon Session');
+      // Verify time sorting within Monday: Morning before Afternoon
+      const morningIndex = sentMessage.indexOf('Charlie — Morning Session');
+      const afternoonIndex = sentMessage.indexOf('Bob — Afternoon Session');
       expect(morningIndex).toBeLessThan(afternoonIndex);
 
-      // Verify time sorting within Friday: 14:00 before 20:00
-      const fridayAfternoonIndex = sentMessage.indexOf('14:00 — Eve — Afternoon Fun');
-      const fridayNightIndex = sentMessage.indexOf('20:00 — Alice — Friday Night Stream');
+      // Verify time sorting within Friday: Afternoon before Night
+      const fridayAfternoonIndex = sentMessage.indexOf('Eve — Afternoon Fun');
+      const fridayNightIndex = sentMessage.indexOf('Alice — Friday Night Stream');
       expect(fridayAfternoonIndex).toBeLessThan(fridayNightIndex);
     });
   });

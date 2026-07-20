@@ -2,6 +2,9 @@
  * Utility for formatting configuration summaries and confirmation messages.
  */
 
+import { formatDiscordTimestamp } from './discord-time.js';
+import { DayOfWeek } from '../types/index.js';
+
 /**
  * Formats a complete bot configuration into a human-readable summary message.
  * The summary contains the channel name, posting day, and posting time.
@@ -23,13 +26,18 @@ export function formatConfigSummary(channelName: string, postingDay: string, pos
 
 /**
  * Formats a confirmation message shown to a user after successfully adding a schedule entry.
- * The message contains the entry's day, start time, and title.
+ * Uses Discord timestamp for localized time display when weekId is provided.
  *
  * @param day - The day of the week for the entry (e.g. "Monday")
  * @param startTime - The start time in HH:MM format
  * @param title - The stream title
+ * @param weekId - The ISO week identifier for Discord timestamp computation
  * @returns A formatted confirmation string containing all three entry details
  */
-export function formatEntryConfirmation(day: string, startTime: string, title: string): string {
+export function formatEntryConfirmation(day: string, startTime: string, title: string, weekId?: string): string {
+  if (weekId) {
+    const timestamp = formatDiscordTimestamp(day as DayOfWeek, startTime, weekId);
+    return `✅ Schedule entry saved!\n• Day: ${day}\n• Time: ${timestamp}\n• Title: ${title}`;
+  }
   return `✅ Schedule entry saved!\n• Day: ${day}\n• Time: ${startTime} UTC\n• Title: ${title}`;
 }

@@ -3,27 +3,20 @@
     {
       "name": "Default",
       "files": [
-        ".kiro/specs/bulk-schedule-command/.config.kiro",
+        "src/utils/discord-time.ts",
         ".vscode/changelists.json",
-        ".kiro/specs/bulk-schedule-command/requirements.md",
-        ".kiro/specs/bulk-schedule-command/design.md",
-        ".kiro/specs/bulk-schedule-command/tasks.md",
-        "src/utils/bulk-parser.ts",
-        "src/utils/bulk-printer.ts",
-        "tests/unit/bulk-parser.test.ts",
-        "src/utils/bulk-validator.ts",
-        "tests/properties/bulk-parser.prop.ts",
-        "tests/unit/bulk-validator.test.ts",
         "src/utils/bulk-response.ts",
-        "tests/properties/bulk-validator.prop.ts",
-        "tests/unit/bulk-response.test.ts",
-        "src/services/schedule-service.ts",
-        "tests/properties/bulk-response.prop.ts",
-        "src/commands/index.ts",
-        "tests/properties/bulk-storage.prop.ts",
+        "src/services/posting-service.ts",
+        "src/utils/format-config.ts",
         "src/commands/schedule.ts",
-        "tests/unit/bulk-command.test.ts",
-        "tests/integration/bulk-flow.test.ts"
+        "tests/unit/posting-service.test.ts",
+        "tests/unit/bulk-response.test.ts",
+        "tests/properties/bulk-response.prop.ts",
+        "tests/unit/schedule-commands.test.ts",
+        "tests/unit/posting-service-class.test.ts",
+        "tests/integration/posting-flow.test.ts",
+        "src/utils/week-calculator.ts",
+        "src/commands/index.ts"
       ]
     }
   ],

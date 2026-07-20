@@ -29,7 +29,7 @@ describe('formatBulkConfirmation', () => {
     const result = formatBulkConfirmation(entries, '2024-W03');
 
     expect(result).toContain('✅ **1 entries added to your schedule (Week 2024-W03)**');
-    expect(result).toContain('• **Monday** 09:00 — Stream');
+    expect(result).toMatch(/• \*\*Monday\*\* <t:\d+:t> — Stream/);
   });
 
   it('orders entries by day (Mon→Sun) then by time', () => {
@@ -43,13 +43,13 @@ describe('formatBulkConfirmation', () => {
 
     const lines = result.split('\n').filter((l) => l.startsWith('•'));
     expect(lines[0]).toContain('Monday');
-    expect(lines[0]).toContain('08:00');
+    expect(lines[0]).toContain('Early');
     expect(lines[1]).toContain('Monday');
-    expect(lines[1]).toContain('10:00');
+    expect(lines[1]).toContain('Morning');
     expect(lines[2]).toContain('Wednesday');
-    expect(lines[2]).toContain('14:00');
+    expect(lines[2]).toContain('Afternoon');
     expect(lines[3]).toContain('Sunday');
-    expect(lines[3]).toContain('20:00');
+    expect(lines[3]).toContain('Evening');
   });
 
   it('truncates when message exceeds 2000 characters', () => {

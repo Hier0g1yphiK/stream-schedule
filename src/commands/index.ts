@@ -102,6 +102,16 @@ function buildScheduleCommand(): SlashCommandBuilder {
           .setRequired(true)
           .setMaxLength(100)
       )
+      .addStringOption((option) =>
+        option
+          .setName('week')
+          .setDescription('Which week to add to (defaults to this week)')
+          .setRequired(false)
+          .addChoices(
+            { name: 'This week', value: 'this' },
+            { name: 'Next week', value: 'next' }
+          )
+      )
   );
 
   // /schedule remove — Everyone
@@ -145,6 +155,16 @@ function buildScheduleCommand(): SlashCommandBuilder {
           .setDescription('Entries separated by | e.g. Monday 09:00 Stream | Friday 20:00 Games')
           .setRequired(true)
           .setMaxLength(6000)
+      )
+      .addStringOption((option) =>
+        option
+          .setName('week')
+          .setDescription('Which week to add to (defaults to this week)')
+          .setRequired(false)
+          .addChoices(
+            { name: 'This week', value: 'this' },
+            { name: 'Next week', value: 'next' }
+          )
       )
   );
 

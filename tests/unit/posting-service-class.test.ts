@@ -285,7 +285,7 @@ describe('PostingService', () => {
 
       expect(sendMock).toHaveBeenCalledWith(expect.stringContaining('Alice'));
       expect(sendMock).toHaveBeenCalledWith(expect.stringContaining('Art Stream'));
-      expect(sendMock).toHaveBeenCalledWith(expect.stringContaining('14:00'));
+      expect(sendMock).toHaveBeenCalledWith(expect.stringMatching(/<t:\d+:t>/));
     });
 
     it('should post "no streams scheduled" when no entries exist', async () => {

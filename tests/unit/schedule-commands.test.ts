@@ -81,7 +81,7 @@ describe('handleScheduleCommand', () => {
         ephemeral: true,
       });
       expect(interaction.reply).toHaveBeenCalledWith({
-        content: expect.stringContaining('14:00'),
+        content: expect.stringContaining('<t:'),
         ephemeral: true,
       });
       expect(interaction.reply).toHaveBeenCalledWith({

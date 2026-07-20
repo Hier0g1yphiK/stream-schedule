@@ -91,18 +91,18 @@ describe('Property 8: Confirmation Message Formatting', () => {
           const lines = message.split('\n').filter((line) => line.startsWith('•'));
           expect(lines.length).toBeGreaterThanOrEqual(1);
 
-          // Verify ordering: extract day and time from each line
-          // Format is: • **Day** HH:MM — Title
+          // Verify ordering: extract day and timestamp from each line
+          // Format is: • **Day** <t:UNIX:t> — Title
           const entryData = lines.map((line) => {
-            const match = line.match(/^• \*\*(\w+)\*\* (\d{2}:\d{2}) — (.+)$/);
+            const match = line.match(/^• \*\*(\w+)\*\* <t:(\d+):t> — (.+)$/);
             expect(match).not.toBeNull();
             return {
               day: match![1] as DayOfWeek,
-              time: match![2],
+              unix: parseInt(match![2], 10),
             };
           });
 
-          // Verify ordering: day order first, then lexicographic time within same day
+          // Verify ordering: day order first, then ascending unix timestamp within same day
           for (let i = 1; i < entryData.length; i++) {
             const prev = entryData[i - 1];
             const curr = entryData[i];
@@ -111,8 +111,8 @@ describe('Property 8: Confirmation Message Formatting', () => {
               // Previous day is earlier - correct order
               continue;
             } else if (dayDiff === 0) {
-              // Same day - time must be ascending (lexicographic)
-              expect(prev.time <= curr.time).toBe(true);
+              // Same day - unix timestamp must be ascending
+              expect(prev.unix <= curr.unix).toBe(true);
             } else {
               // Previous day is later - incorrect order
               expect(dayDiff).toBeLessThanOrEqual(0);

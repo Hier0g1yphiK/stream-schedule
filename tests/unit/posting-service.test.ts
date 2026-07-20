@@ -56,9 +56,10 @@ describe('formatSchedule', () => {
     const result = formatSchedule(entries);
 
     const mondaySection = result.split('**Monday**')[1];
-    const earlyIndex = mondaySection.indexOf('08:00');
-    const midIndex = mondaySection.indexOf('14:00');
-    const lateIndex = mondaySection.indexOf('20:00');
+    // Discord timestamps encode time as unix seconds; earlier times have smaller values
+    const earlyIndex = mondaySection.indexOf('Early');
+    const midIndex = mondaySection.indexOf('Mid');
+    const lateIndex = mondaySection.indexOf('Late');
 
     expect(earlyIndex).toBeLessThan(midIndex);
     expect(midIndex).toBeLessThan(lateIndex);
@@ -81,14 +82,15 @@ describe('formatSchedule', () => {
     expect(wednesdayIdx).toBeLessThan(sundayIdx);
   });
 
-  it('should format each entry with bullet, time, username, and title', () => {
+  it('should format each entry with bullet, Discord timestamp, username, and title', () => {
     const entries = [
       makeEntry({ startTime: '14:30', username: 'CoolStreamer', title: 'Art Stream' }),
     ];
 
     const result = formatSchedule(entries);
 
-    expect(result).toContain('• 14:30 — CoolStreamer — Art Stream');
+    // Should contain a Discord timestamp pattern and the username/title
+    expect(result).toMatch(/• <t:\d+:t> — CoolStreamer — Art Stream/);
   });
 
   it('should handle multiple streamers on the same day', () => {
@@ -99,8 +101,8 @@ describe('formatSchedule', () => {
 
     const result = formatSchedule(entries);
 
-    expect(result).toContain('• 10:00 — Alice — Morning Chill');
-    expect(result).toContain('• 20:00 — Bob — Evening Gameplay');
+    expect(result).toMatch(/• <t:\d+:t> — Alice — Morning Chill/);
+    expect(result).toMatch(/• <t:\d+:t> — Bob — Evening Gameplay/);
   });
 
   it('should handle entries across all seven days', () => {

@@ -109,6 +109,32 @@ export function getCurrentWeekId(postingDay: DayOfWeek, postingTime: string, now
 }
 
 /**
+ * Returns the ISO week string (YYYY-Www) for the week AFTER the current scheduling week.
+ * This is always one week ahead of getCurrentWeekId.
+ */
+export function getNextWeekId(postingDay: DayOfWeek, postingTime: string, now?: Date): string {
+  const currentWeekId = getCurrentWeekId(postingDay, postingTime, now);
+  // Parse the current week ID and add 1 week
+  const match = currentWeekId.match(/^(\d{4})-W(\d{2})$/);
+  if (!match) {
+    throw new Error(`Invalid weekId: ${currentWeekId}`);
+  }
+  const year = parseInt(match[1], 10);
+  const week = parseInt(match[2], 10);
+
+  // To get the next week's ID correctly (handling year boundaries),
+  // find the Monday of the current ISO week, add 7 days, and compute its ISO week.
+  const jan4 = new Date(Date.UTC(year, 0, 4));
+  const jan4Day = jan4.getUTCDay() || 7;
+  const mondayOfWeek1 = new Date(jan4.getTime() - (jan4Day - 1) * 86400000);
+  const mondayOfCurrentWeek = new Date(mondayOfWeek1.getTime() + (week - 1) * 7 * 86400000);
+  const mondayOfNextWeek = new Date(mondayOfCurrentWeek.getTime() + 7 * 86400000);
+
+  const { year: nextYear, week: nextWeek } = getISOWeekData(mondayOfNextWeek);
+  return formatWeekId(nextYear, nextWeek);
+}
+
+/**
  * Computes the next posting Date (UTC) from a given reference point.
  *
  * If the posting day/time has not yet passed in the current week relative to `from`,

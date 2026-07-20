@@ -6,6 +6,7 @@
 import { ScheduleEntry, DayOfWeek } from '../types';
 import { BulkValidationError } from './bulk-validator';
 import { LineParseResult } from './bulk-parser';
+import { formatDiscordTimestamp } from './discord-time';
 
 /** Discord message character limit. */
 const DISCORD_MAX_LENGTH = 2000;
@@ -24,6 +25,7 @@ const DAY_ORDER: Record<DayOfWeek, number> = {
 /**
  * Formats a success confirmation message.
  * Lists entries ordered by day (Mon→Sun) then time.
+ * Uses Discord timestamps for localized time display.
  * Truncates if message would exceed 2000 characters.
  */
 export function formatBulkConfirmation(
@@ -38,7 +40,7 @@ export function formatBulkConfirmation(
 
   const header = `✅ **${sorted.length} entries added to your schedule (Week ${weekId})**\n\n`;
   const entryLines = sorted.map(
-    (entry) => `• **${entry.day}** ${entry.startTime} — ${entry.title}`
+    (entry) => `• **${entry.day}** ${formatDiscordTimestamp(entry.day, entry.startTime, weekId)} — ${entry.title}`
   );
 
   // Check if full message fits within Discord limit

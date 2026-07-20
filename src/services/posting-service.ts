@@ -4,6 +4,7 @@ import { DayOfWeek, ScheduleEntry } from '../types';
 import { ConfigService } from './config-service';
 import { ScheduleService } from './schedule-service';
 import { isPostingTime, getCurrentWeekId } from '../utils/week-calculator';
+import { formatDiscordTimestamp } from '../utils/discord-time';
 
 /**
  * Order of days for schedule display (Monday–Sunday).
@@ -22,16 +23,20 @@ const DAY_ORDER: DayOfWeek[] = [
  * Formats a list of schedule entries into a Discord-ready message.
  *
  * Groups entries by day (Monday–Sunday order), sorts by start time within
- * each day, and displays streamer name, time, and title.
+ * each day, and displays streamer name, Discord timestamp, and title.
+ * Discord timestamps render in each viewer's local timezone.
  *
  * Returns a "no streams scheduled" message when entries is empty.
  *
  * Requirements: 5.2, 5.3
  */
-export function formatSchedule(entries: ScheduleEntry[]): string {
+export function formatSchedule(entries: ScheduleEntry[], weekId?: string): string {
   if (entries.length === 0) {
     return '📅 **Weekly Stream Schedule**\n\nNo streams scheduled this week.';
   }
+
+  // Use provided weekId or fall back to the first entry's weekId
+  const resolvedWeekId = weekId ?? entries[0].weekId;
 
   // Group entries by day
   const grouped = new Map<DayOfWeek, ScheduleEntry[]>();
@@ -56,7 +61,8 @@ export function formatSchedule(entries: ScheduleEntry[]): string {
     lines.push('');
     lines.push(`**${day}**`);
     for (const entry of dayEntries) {
-      lines.push(`• ${entry.startTime} — ${entry.username} — ${entry.title}`);
+      const timestamp = formatDiscordTimestamp(entry.day, entry.startTime, resolvedWeekId);
+      lines.push(`• ${timestamp} — ${entry.username} — ${entry.title}`);
     }
   }
 
@@ -180,7 +186,7 @@ export class PostingService {
 
     const weekId = getCurrentWeekId(config.postingDay, config.postingTime);
     const entries = this.scheduleService.getEntriesForWeek(guildId, weekId);
-    const message = formatSchedule(entries);
+    const message = formatSchedule(entries, weekId);
 
     // First attempt
     const firstAttempt = await this.attemptPost(config.channelId, message);

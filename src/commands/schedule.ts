@@ -12,6 +12,7 @@ import { ScheduleService } from '../services/schedule-service.js';
 import { validateTime, validateTitle } from '../utils/validators.js';
 import { getCurrentWeekId } from '../utils/week-calculator.js';
 import { formatEntryConfirmation } from '../utils/format-config.js';
+import { formatDiscordTimestamp } from '../utils/discord-time.js';
 import { parseBulkInput } from '../utils/bulk-parser.js';
 import { validateBulkEntries } from '../utils/bulk-validator.js';
 import {
@@ -22,15 +23,45 @@ import {
 } from '../utils/bulk-response.js';
 
 /**
- * Resolves the current week ID for a guild based on its configuration.
- * If the guild config is incomplete (no posting day/time set), uses
- * defaults of Monday at 09:00 UTC.
+ * Resolves the week ID for a guild based on configuration and optional user choice.
+ *
+ * When weekChoice is explicitly set:
+ * - 'this' = the current ISO calendar week (the week you're physically in)
+ * - 'next' = the next ISO calendar week
+ *
+ * When weekChoice is null/undefined (auto-detect):
+ * - Uses the posting-boundary logic: before posting time = current cycle,
+ *   after posting time = next cycle.
  */
-function resolveWeekId(configService: ConfigService, guildId: string): string {
+function resolveWeekId(configService: ConfigService, guildId: string, weekChoice?: string | null): string {
   const config = configService.getConfig(guildId);
   const postingDay = config.postingDay ?? DayOfWeek.Monday;
   const postingTime = config.postingTime ?? '09:00';
+
+  if (weekChoice === 'this') {
+    // User explicitly chose "This week" — use the current ISO calendar week
+    return getISOWeekIdForDate(new Date());
+  }
+  if (weekChoice === 'next') {
+    // User explicitly chose "Next week" — use next ISO calendar week
+    const nextMonday = new Date();
+    nextMonday.setUTCDate(nextMonday.getUTCDate() + 7);
+    return getISOWeekIdForDate(nextMonday);
+  }
+  // Auto-detect based on posting schedule
   return getCurrentWeekId(postingDay, postingTime);
+}
+
+/**
+ * Returns the ISO week ID (YYYY-Www) for a given date.
+ */
+function getISOWeekIdForDate(date: Date): string {
+  const d = new Date(Date.UTC(date.getUTCFullYear(), date.getUTCMonth(), date.getUTCDate()));
+  const dayNum = d.getUTCDay() || 7;
+  d.setUTCDate(d.getUTCDate() + 4 - dayNum);
+  const yearStart = new Date(Date.UTC(d.getUTCFullYear(), 0, 1));
+  const weekNo = Math.ceil(((d.getTime() - yearStart.getTime()) / 86400000 + 1) / 7);
+  return `${d.getUTCFullYear()}-W${weekNo.toString().padStart(2, '0')}`;
 }
 
 /**
@@ -65,7 +96,8 @@ async function handleAdd(
   const guildId = interaction.guildId!;
   const userId = interaction.user.id;
   const username = interaction.user.username;
-  const weekId = resolveWeekId(configService, guildId);
+  const weekChoice = interaction.options.getString('week');
+  const weekId = resolveWeekId(configService, guildId, weekChoice);
 
   try {
     scheduleService.addEntry(guildId, userId, username, day as DayOfWeek, time, title, weekId);
@@ -81,7 +113,7 @@ async function handleAdd(
     throw error;
   }
 
-  const confirmation = formatEntryConfirmation(day, time, title);
+  const confirmation = formatEntryConfirmation(day, time, title, weekId);
   await interaction.reply({ content: confirmation, ephemeral: true });
 }
 
@@ -151,7 +183,7 @@ async function handleMine(
   }
 
   const lines = entries.map(
-    (entry) => `• **${entry.day}** at ${entry.startTime} UTC — ${entry.title}`
+    (entry) => `• **${entry.day}** at ${formatDiscordTimestamp(entry.day, entry.startTime, weekId)} — ${entry.title}`
   );
 
   const message = `📋 **Your entries for this week (${weekId}):**\n${lines.join('\n')}`;
@@ -194,11 +226,12 @@ async function handleBulk(
     return;
   }
 
-  // Step 5: Resolve the current week ID using guild config
+  // Step 5: Resolve the week ID using guild config and optional user choice
   const guildId = interaction.guildId!;
   const userId = interaction.user.id;
   const username = interaction.user.username;
-  const weekId = resolveWeekId(configService, guildId);
+  const weekChoice = interaction.options.getString('week');
+  const weekId = resolveWeekId(configService, guildId, weekChoice);
 
   // Step 6: Store entries atomically
   try {
