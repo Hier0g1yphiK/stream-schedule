@@ -1,7 +1,17 @@
 import Database from 'better-sqlite3';
 import { DayOfWeek, ScheduleEntry } from '../types/index.js';
+import { NormalizedEntry } from '../utils/bulk-validator.js';
 
 const MAX_ENTRIES_PER_STREAMER_PER_WEEK = 20;
+
+/**
+ * Result of a bulk add operation, containing counts and the resulting entries.
+ */
+export interface BulkAddResult {
+  added: number;
+  replaced: number;
+  entries: ScheduleEntry[];
+}
 
 /**
  * Row shape returned by SQLite queries on the schedule_entries table.
@@ -170,5 +180,96 @@ export class ScheduleService {
     this.db
       .prepare('DELETE FROM schedule_entries WHERE guild_id = ? AND week_id = ?')
       .run(guildId, weekId);
+  }
+
+  /**
+   * Stores all entries in a single transaction with UPSERT semantics.
+   * Pre-checks net new count against the 20-entry limit.
+   *
+   * @throws Error if net new entries would exceed the 20-entry weekly limit
+   * @throws Error if any entry fails to store (full rollback via transaction)
+   */
+  bulkAddEntries(
+    guildId: string,
+    userId: string,
+    username: string,
+    entries: NormalizedEntry[],
+    weekId: string
+  ): BulkAddResult {
+    // Pre-check: calculate net new count
+    const existingCount = this.getEntryCount(guildId, userId, weekId);
+
+    // Count how many submitted entries match an existing entry (replacements)
+    const checkExisting = this.db.prepare(
+      `SELECT id FROM schedule_entries
+       WHERE guild_id = ? AND user_id = ? AND day = ? AND start_time = ? AND week_id = ?`
+    );
+
+    let replacements = 0;
+    for (const entry of entries) {
+      const existing = checkExisting.get(guildId, userId, entry.day, entry.startTime, weekId) as
+        | { id: number }
+        | undefined;
+      if (existing) {
+        replacements++;
+      }
+    }
+
+    const netNew = entries.length - replacements;
+    if (existingCount + netNew > MAX_ENTRIES_PER_STREAMER_PER_WEEK) {
+      throw new Error(
+        `Adding ${netNew} new entries would exceed the maximum of ${MAX_ENTRIES_PER_STREAMER_PER_WEEK} entries per streamer per week. You currently have ${existingCount} entries.`
+      );
+    }
+
+    // Execute all inserts/upserts in a single transaction
+    const upsertStmt = this.db.prepare(
+      `INSERT INTO schedule_entries (guild_id, user_id, username, day, start_time, title, week_id)
+       VALUES (?, ?, ?, ?, ?, ?, ?)
+       ON CONFLICT(guild_id, user_id, day, start_time, week_id)
+       DO UPDATE SET title = excluded.title, username = excluded.username`
+    );
+
+    const selectStmt = this.db.prepare(
+      `SELECT id, guild_id, user_id, username, day, start_time, title, week_id
+       FROM schedule_entries
+       WHERE guild_id = ? AND user_id = ? AND day = ? AND start_time = ? AND week_id = ?`
+    );
+
+    let added = 0;
+    let replaced = 0;
+    const resultEntries: ScheduleEntry[] = [];
+
+    const transaction = this.db.transaction(() => {
+      for (const entry of entries) {
+        // Check if this is a replacement or new entry
+        const existing = checkExisting.get(guildId, userId, entry.day, entry.startTime, weekId) as
+          | { id: number }
+          | undefined;
+
+        if (existing) {
+          replaced++;
+        } else {
+          added++;
+        }
+
+        // UPSERT the entry
+        upsertStmt.run(guildId, userId, username, entry.day, entry.startTime, entry.title, weekId);
+
+        // Retrieve the resulting entry
+        const row = selectStmt.get(
+          guildId,
+          userId,
+          entry.day,
+          entry.startTime,
+          weekId
+        ) as ScheduleEntryRow;
+        resultEntries.push(rowToEntry(row));
+      }
+    });
+
+    transaction();
+
+    return { added, replaced, entries: resultEntries };
   }
 }

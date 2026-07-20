@@ -134,6 +134,20 @@ function buildScheduleCommand(): SlashCommandBuilder {
       .setDescription('View your schedule entries for this week')
   );
 
+  // /schedule bulk — Everyone
+  command.addSubcommand((sub) =>
+    sub
+      .setName('bulk')
+      .setDescription('Add multiple schedule entries at once')
+      .addStringOption((option) =>
+        option
+          .setName('entries')
+          .setDescription('Entries separated by | e.g. Monday 09:00 Stream | Friday 20:00 Games')
+          .setRequired(true)
+          .setMaxLength(6000)
+      )
+  );
+
   return command;
 }
 

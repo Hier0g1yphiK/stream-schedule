@@ -12,6 +12,14 @@ import { ScheduleService } from '../services/schedule-service.js';
 import { validateTime, validateTitle } from '../utils/validators.js';
 import { getCurrentWeekId } from '../utils/week-calculator.js';
 import { formatEntryConfirmation } from '../utils/format-config.js';
+import { parseBulkInput } from '../utils/bulk-parser.js';
+import { validateBulkEntries } from '../utils/bulk-validator.js';
+import {
+  formatBulkConfirmation,
+  formatBulkErrors,
+  formatNoEntriesError,
+  formatLimitExceededError,
+} from '../utils/bulk-response.js';
 
 /**
  * Resolves the current week ID for a guild based on its configuration.
@@ -151,7 +159,96 @@ async function handleMine(
 }
 
 /**
- * Main handler for all /schedule subcommands (add, remove, mine).
+ * Handles the /schedule bulk subcommand.
+ *
+ * Pipeline: parse → validate → pre-check → store → respond.
+ * Error precedence: no entries → parse errors → count > 20 → validation errors → net new limit → storage failure.
+ */
+async function handleBulk(
+  interaction: ChatInputCommandInteraction,
+  configService: ConfigService,
+  scheduleService: ScheduleService
+): Promise<void> {
+  const entries = interaction.options.getString('entries', true);
+
+  // Step 1: Parse the bulk input
+  const parseResult = parseBulkInput(entries);
+
+  // Step 2: No entries and no errors means all blank/whitespace input
+  if (parseResult.entries.length === 0 && parseResult.errors.length === 0) {
+    await interaction.reply({ content: formatNoEntriesError(), ephemeral: true });
+    return;
+  }
+
+  // Step 3: Parse errors take precedence
+  if (parseResult.errors.length > 0) {
+    await interaction.reply({ content: formatBulkErrors(parseResult.errors, []), ephemeral: true });
+    return;
+  }
+
+  // Step 4: Validate entries (includes count > 20 check)
+  const validationResult = validateBulkEntries(parseResult.entries);
+
+  if (!validationResult.valid) {
+    await interaction.reply({ content: formatBulkErrors([], validationResult.errors), ephemeral: true });
+    return;
+  }
+
+  // Step 5: Resolve the current week ID using guild config
+  const guildId = interaction.guildId!;
+  const userId = interaction.user.id;
+  const username = interaction.user.username;
+  const weekId = resolveWeekId(configService, guildId);
+
+  // Step 6: Store entries atomically
+  try {
+    const result = scheduleService.bulkAddEntries(guildId, userId, username, validationResult.normalizedEntries, weekId);
+    await interaction.reply({ content: formatBulkConfirmation(result.entries, weekId), ephemeral: true });
+  } catch (error: unknown) {
+    if (error instanceof Error && error.message.includes('exceed')) {
+      // Net new limit exceeded — parse the counts from the error message
+      const existingCount = scheduleService.getEntryCount(guildId, userId, weekId);
+      const netNew = validationResult.normalizedEntries.length - countReplacements(scheduleService, guildId, userId, validationResult.normalizedEntries, weekId);
+      await interaction.reply({
+        content: formatLimitExceededError(existingCount, netNew, 20),
+        ephemeral: true,
+      });
+      return;
+    }
+    // Generic storage failure
+    await interaction.reply({
+      content: '❌ Failed to save entries. Please try again.',
+      ephemeral: true,
+    });
+  }
+}
+
+/**
+ * Counts how many of the submitted entries would replace existing entries
+ * (same day and start time for the same user/guild/week).
+ */
+function countReplacements(
+  scheduleService: ScheduleService,
+  guildId: string,
+  userId: string,
+  entries: { day: DayOfWeek; startTime: string }[],
+  weekId: string
+): number {
+  const existingEntries = scheduleService.getEntriesForUser(guildId, userId, weekId);
+  let replacements = 0;
+  for (const entry of entries) {
+    const match = existingEntries.find(
+      (e) => e.day === entry.day && e.startTime === entry.startTime
+    );
+    if (match) {
+      replacements++;
+    }
+  }
+  return replacements;
+}
+
+/**
+ * Main handler for all /schedule subcommands (add, remove, mine, bulk).
  * Routes to the appropriate subcommand handler based on the interaction.
  */
 export async function handleScheduleCommand(
@@ -170,6 +267,9 @@ export async function handleScheduleCommand(
       break;
     case 'mine':
       await handleMine(interaction, configService, scheduleService);
+      break;
+    case 'bulk':
+      await handleBulk(interaction, configService, scheduleService);
       break;
     default:
       await interaction.reply({
